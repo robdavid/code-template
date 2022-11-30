@@ -41,6 +41,14 @@ func (nr *numRange) undefined() bool {
 	return nr.from == 0 && nr.to == 0 && nr.step == 0
 }
 
+func (nr *numRange) inRange(n int) bool {
+	if nr.from > nr.to {
+		return n <= nr.from && n >= nr.to
+	} else {
+		return n >= nr.from && n <= nr.to
+	}
+}
+
 func must[T any](t T, e error) T {
 	if e != nil {
 		panic(e)
@@ -55,7 +63,7 @@ func parseNumRange(nrange string) (result numRange, err error) {
 		return
 	}
 	var matches []string
-	if matches := numRangeRegexp.FindStringSubmatch(nrange); matches == nil {
+	if matches = numRangeRegexp.FindStringSubmatch(nrange); matches == nil {
 		err = fmt.Errorf("%w: %s", errInvalidNumberRange, nrange)
 		return
 	}
@@ -98,9 +106,9 @@ func generate(nrange string, templateFiles []string) (err error) {
 				err = fmt.Errorf("%s: %w", file, err)
 			}
 		} else {
-			for n := numr.from; n != numr.from; n += numr.step {
+			for n := numr.from; numr.inRange(n); n += numr.step {
 				values := Values{Num: n}
-				if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s_%d.go", ext, noext, n)); err != nil {
+				if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s_%d.go", noext, ext, n)); err != nil {
 					err = fmt.Errorf("%s: %w", file, err)
 				}
 			}

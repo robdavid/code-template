@@ -1,5 +1,5 @@
 package examples
 
-func hello() string {
-	return {{ printf "\"hello-world\"" }}
+func hello{{ .Num }}() string {
+	return {{ printf "\"hello-world %d\"" .Num }}
 }
