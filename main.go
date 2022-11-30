@@ -81,7 +81,14 @@ func generate(nrange string, templateFiles []string) (err error) {
 		if ext = filepath.Ext(noext); ext != "" {
 			noext = noext[:len(noext)-len(ext)]
 		}
-		if tpl, err = template.New("base").Funcs(sprig.FuncMap()).ParseFiles(file); err != nil {
+		var content []byte
+		var textContent string
+		if content, err = os.ReadFile(file); err != nil {
+			err = fmt.Errorf("%s: %w", file, err)
+			return
+		}
+		textContent = string(content)
+		if tpl, err = template.New("base").Funcs(sprig.FuncMap()).Parse(textContent); err != nil {
 			err = fmt.Errorf("%s: %w", file, err)
 			return
 		}
