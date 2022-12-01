@@ -1,5 +1,7 @@
 package examples
 
-func hello{{ .Num }}() string {
-	return {{ printf "\"hello-world %d\"" .Num }}
+{{ range $i,$n :=  seq .start .end -}}
+func hello{{ $n }}() string {
+	return {{ printf "\"hello-world %d\"" $n }}
 }
+{{ end -}}

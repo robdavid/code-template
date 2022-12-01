@@ -4,6 +4,8 @@ go 1.19
 
 require github.com/Masterminds/sprig/v3 v3.2.2
 
+require gopkg.in/yaml.v2 v2.4.0 // indirect
+
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
@@ -14,5 +16,6 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
+	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904 // indirect
 )

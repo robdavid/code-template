@@ -1,27 +1,33 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"text/template"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/Masterminds/sprig/v3"
+	flag "github.com/spf13/pflag"
 )
 
 var errInvalidNumberRange = errors.New("invalid number range")
 
 func main() {
 	var nrange string
+	var values map[string]string
 
 	flag.StringVar(&nrange, "num-range", "", "Numeric range to iterator over in format n..m")
+	flag.StringToStringVar(&values, "set", nil, "set a value to place define for template .")
 
 	flag.Parse()
-	if err := generate(nrange, flag.Args()); err != nil {
+	if err := generate(nrange, mapValues(values), flag.Args()); err != nil {
 		fmt.Fprintf(os.Stderr, "code-template: %s\n", err.Error())
 		os.Exit(1)
 	}
@@ -42,7 +48,7 @@ func (nr *numRange) undefined() bool {
 }
 
 func (nr *numRange) inRange(n int) bool {
-	if nr.from > nr.to {
+	if nr.step < 0 {
 		return n <= nr.from && n >= nr.to
 	} else {
 		return n >= nr.from && n <= nr.to
@@ -77,7 +83,22 @@ func parseNumRange(nrange string) (result numRange, err error) {
 	return
 }
 
-func generate(nrange string, templateFiles []string) (err error) {
+func mapValues(strValues map[string]string) (output map[string]any) {
+	output = make(map[string]any)
+	for name, value := range strValues {
+		var v any
+		if json.Unmarshal([]byte(value), &v) != nil {
+			v = value
+		}
+		if yaml.Unmarshal([]byte(value), &v) != nil {
+			v = value
+		}
+		output[name] = v
+	}
+	return
+}
+
+func generate(nrange string, values map[string]any, templateFiles []string) (err error) {
 	var numr numRange
 	if numr, err = parseNumRange(nrange); err != nil {
 		return
@@ -95,20 +116,32 @@ func generate(nrange string, templateFiles []string) (err error) {
 			err = fmt.Errorf("%s: %w", file, err)
 			return
 		}
+		include := func(templateName string, values any) (string, error) {
+			var result strings.Builder
+			if err := tpl.ExecuteTemplate(&result, templateName, values); err != nil {
+				return "", nil
+			} else {
+				return result.String(), nil
+			}
+		}
+		includeFuncMap := map[string]any{"include": include}
 		textContent = string(content)
-		if tpl, err = template.New("base").Funcs(sprig.FuncMap()).Parse(textContent); err != nil {
+		if tpl, err = template.New(filepath.Base(file)).
+			Funcs(sprig.FuncMap()).
+			Funcs(tmplFuncs).
+			Funcs(includeFuncMap).
+			Parse(textContent); err != nil {
 			err = fmt.Errorf("%s: %w", file, err)
 			return
 		}
 		if numr.undefined() {
-			values := Values{}
-			if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s.go", noext, ext)); err != nil {
+			if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s.go", noext, ext[1:])); err != nil {
 				err = fmt.Errorf("%s: %w", file, err)
 			}
 		} else {
 			for n := numr.from; numr.inRange(n); n += numr.step {
-				values := Values{Num: n}
-				if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s_%d.go", noext, ext, n)); err != nil {
+				values["Num"] = n
+				if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s_%d.go", noext, ext[1:], n)); err != nil {
 					err = fmt.Errorf("%s: %w", file, err)
 				}
 			}
