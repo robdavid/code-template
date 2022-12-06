@@ -1,9 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
+
+var errBadType = errors.New("bad type")
 
 type ordered interface {
 	int8 | int16 | int32 | int64 | int |
@@ -51,7 +54,7 @@ func (e Enumerated) String() string {
 	return fmt.Sprintf("(%d,%#v)", e.Index, e.Value)
 }
 
-func enmerate(in any) (out []Enumerated) {
+func enumerate(in any) (out []Enumerated) {
 	value := reflect.ValueOf(in)
 	if value.Kind() == reflect.Slice {
 		len := value.Len()
@@ -64,7 +67,38 @@ func enmerate(in any) (out []Enumerated) {
 	return
 }
 
+func absTmpl(u any) (v any, err error) {
+	switch o := u.(type) {
+	case int:
+		v = abs(o)
+	case int8:
+		v = abs(o)
+	case int16:
+		v = abs(o)
+	case int32:
+		v = abs(o)
+	case int64:
+		v = abs(o)
+	case uint8:
+		v = abs(o)
+	case uint16:
+		v = abs(o)
+	case uint32:
+		v = abs(o)
+	case uint64:
+		v = abs(o)
+	case float32:
+		v = abs(o)
+	case float64:
+		v = abs(o)
+	default:
+		err = fmt.Errorf("%w: %T", errBadType, u)
+	}
+	return
+}
+
 var tmplFuncs = map[string]any{
 	"seq":       seq,
-	"enumerate": enmerate,
+	"enumerate": enumerate,
+	"abs":       absTmpl,
 }
