@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"reflect"
+)
+
 type ordered interface {
 	int8 | int16 | int32 | int64 | int |
 		uint8 | uint16 | uint32 | uint64 | uint |
@@ -14,6 +19,8 @@ func abs[T ordered](t T) T {
 	}
 }
 
+// Like the sprig seq function, except returns a slice
+// of ints rather than a string.
 func seq(params ...int) []int {
 	var nr numRange
 	nr.step = 1
@@ -35,6 +42,29 @@ func seq(params ...int) []int {
 	return result
 }
 
+type Enumerated struct {
+	Value any
+	Index int
+}
+
+func (e Enumerated) String() string {
+	return fmt.Sprintf("(%d,%#v)", e.Index, e.Value)
+}
+
+func enmerate(in any) (out []Enumerated) {
+	value := reflect.ValueOf(in)
+	if value.Kind() == reflect.Slice {
+		len := value.Len()
+		out = make([]Enumerated, len)
+		for i := 0; i < len; i++ {
+			out[i].Index = i
+			out[i].Value = value.Index(i).Interface()
+		}
+	}
+	return
+}
+
 var tmplFuncs = map[string]any{
-	"seq": seq,
+	"seq":       seq,
+	"enumerate": enmerate,
 }
