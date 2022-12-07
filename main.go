@@ -1,100 +1,47 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"text/template"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/Masterminds/sprig/v3"
 	flag "github.com/spf13/pflag"
 )
 
 var errInvalidNumberRange = errors.New("invalid number range")
+var errKeyConflict = errors.New("conflicting property key")
+
+type options struct {
+	nrange string
+	values map[string]string
+	files  []string
+}
 
 func main() {
-	var nrange string
-	var values map[string]string
+	var opts options
 
-	flag.StringVar(&nrange, "num-range", "", "Numeric range to iterator over in format n..m")
-	flag.StringToStringVar(&values, "set", nil, "set a value to place define for template .")
+	flag.StringVar(&opts.nrange, "num-range", "", "Numeric range to iterator over in format n..m")
+	flag.StringToStringVar(&opts.values, "set", nil, "Set a value to place within template values")
 
 	flag.Parse()
-	if err := generate(nrange, mapValues(values), flag.Args()); err != nil {
+	opts.files = flag.Args()
+
+	if err := run(&opts); err != nil {
 		fmt.Fprintf(os.Stderr, "code-template: %s\n", err.Error())
 		os.Exit(1)
 	}
-
 }
 
-type Values struct {
-	Num int
-}
-
-type numRange struct {
-	from, to int
-	step     int
-}
-
-func (nr *numRange) undefined() bool {
-	return nr.from == 0 && nr.to == 0 && nr.step == 0
-}
-
-func (nr *numRange) inRange(n int) bool {
-	if nr.step < 0 {
-		return n <= nr.from && n >= nr.to
-	} else {
-		return n >= nr.from && n <= nr.to
+func run(opts *options) (err error) {
+	var values map[string]any
+	if values, err = mapValues(opts.values); err != nil {
+		return err
 	}
-}
-
-func must[T any](t T, e error) T {
-	if e != nil {
-		panic(e)
-	}
-	return t
-}
-
-var numRangeRegexp = regexp.MustCompile(`^([0-9]+)\.\.([0-9]+)$`)
-
-func parseNumRange(nrange string) (result numRange, err error) {
-	if nrange == "" {
-		return
-	}
-	var matches []string
-	if matches = numRangeRegexp.FindStringSubmatch(nrange); matches == nil {
-		err = fmt.Errorf("%w: %s", errInvalidNumberRange, nrange)
-		return
-	}
-	result.from = must(strconv.Atoi(matches[1]))
-	result.to = must(strconv.Atoi(matches[2]))
-	if result.to < result.from {
-		result.step = -1
-	} else {
-		result.step = 1
-	}
-	return
-}
-
-func mapValues(strValues map[string]string) (output map[string]any) {
-	output = make(map[string]any)
-	for name, value := range strValues {
-		var v any
-		if json.Unmarshal([]byte(value), &v) != nil {
-			v = value
-		}
-		if yaml.Unmarshal([]byte(value), &v) != nil {
-			v = value
-		}
-		output[name] = v
-	}
+	err = generate(opts.nrange, values, opts.files)
 	return
 }
 
