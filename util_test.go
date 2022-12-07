@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,4 +76,14 @@ func TestMapValues(t *testing.T) {
 	actual, err := mapValues(input)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
+}
+
+func TestGenerateRange(t *testing.T) {
+	template := `{{ .my.range.value }}{{ .my.range.delim }}`
+	expected := "1-2-3-4-5-"
+	var output strings.Builder
+	opts := optValues{nrangeVar: "my.range.value", nrange: "1..5", values: map[string]string{"my.range.delim": "-"}}
+	err := generate(&opts, "test", template, &output)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, output.String())
 }

@@ -1,0 +1,19 @@
+{{ if eq .hello.counter 1 -}}
+package examples
+import "fmt"
+
+{{ end -}}
+
+func hello{{ .hello.counter }}() string {
+	return {{ printf "\"hello-world %d\\n\"" .hello.counter }}
+}
+
+{{ if eq .hello.counter 5 -}}
+func main() {
+{{- range seq 1 .hello.counter }}
+  fmt.Println(hello{{.}}())
+{{- end }}
+}
+{{ end -}}
+
+

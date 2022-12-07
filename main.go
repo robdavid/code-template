@@ -6,102 +6,80 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
 	flag "github.com/spf13/pflag"
 )
 
 var errInvalidNumberRange = errors.New("invalid number range")
 var errKeyConflict = errors.New("conflicting property key")
+var errBadNrange = errors.New("expected number range in the format var.name=<range>")
+
+type optValues struct {
+	nrangeSpec string
+	nrange     string
+	nrangeVar  string
+	values     map[string]string
+}
+
+func (opts *optValues) ParseNRange() error {
+	if pos := strings.Index(opts.nrangeSpec, "="); pos < 0 {
+		return errBadNrange
+	} else {
+		opts.nrange = strings.TrimSpace(opts.nrangeSpec[pos+1:])
+		opts.nrangeVar = strings.TrimSpace(opts.nrangeSpec[:pos])
+		return nil
+	}
+}
 
 type options struct {
-	nrange string
-	values map[string]string
-	files  []string
+	optValues
+	files []string
 }
 
 func main() {
 	var opts options
+	var help bool
 
-	flag.StringVar(&opts.nrange, "num-range", "", "Numeric range to iterator over in format n..m")
+	flag.BoolVarP(&help, "help", "h", false, "Display help")
+	flag.StringVar(&opts.nrangeSpec, "num-range", "", "Numeric range to iterator over in format var.name=n..m")
 	flag.StringToStringVar(&opts.values, "set", nil, "Set a value to place within template values")
-
 	flag.Parse()
+
+	if help {
+		fmt.Fprintln(os.Stderr, "Usage: code-template [options] files...")
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
 	opts.files = flag.Args()
 
-	if err := run(&opts); err != nil {
+	var err error
+	if err = opts.ParseNRange(); err == nil {
+		err = generateForOpts(&opts)
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "code-template: %s\n", err.Error())
 		os.Exit(1)
 	}
 }
 
-func run(opts *options) (err error) {
-	var values map[string]any
-	if values, err = mapValues(opts.values); err != nil {
-		return err
-	}
-	err = generate(opts.nrange, values, opts.files)
-	return
-}
-
-func generate(nrange string, values map[string]any, templateFiles []string) (err error) {
-	var numr numRange
-	if numr, err = parseNumRange(nrange); err != nil {
-		return
-	}
-	for _, file := range templateFiles {
-		var tpl *template.Template
-		var ext string
-		noext := file
-		if ext = filepath.Ext(noext); ext != "" {
-			noext = noext[:len(noext)-len(ext)]
-		}
-		var content []byte
-		var textContent string
-		if content, err = os.ReadFile(file); err != nil {
-			err = fmt.Errorf("%s: %w", file, err)
-			return
-		}
-		include := func(templateName string, values any) (string, error) {
-			var result strings.Builder
-			if err := tpl.ExecuteTemplate(&result, templateName, values); err != nil {
-				return "", nil
-			} else {
-				return result.String(), nil
-			}
-		}
-		includeFuncMap := map[string]any{"include": include}
-		textContent = string(content)
-		if tpl, err = template.New(filepath.Base(file)).
-			Funcs(sprig.FuncMap()).
-			Funcs(tmplFuncs).
-			Funcs(includeFuncMap).
-			Parse(textContent); err != nil {
-			err = fmt.Errorf("%s: %w", file, err)
-			return
-		}
-		if numr.undefined() {
-			if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s.go", noext, ext[1:])); err != nil {
-				err = fmt.Errorf("%s: %w", file, err)
-			}
-		} else {
-			for n := numr.from; numr.inRange(n); n += numr.step {
-				values["Num"] = n
-				if err = writeTemplate(tpl, &values, fmt.Sprintf("%s_%s_%d.go", noext, ext[1:], n)); err != nil {
-					err = fmt.Errorf("%s: %w", file, err)
+func generateForOpts(opts *options) (err error) {
+	for _, s := range opts.files {
+		var errFile string
+		if glob, gerr := filepath.Glob(s); gerr != nil && len(glob) > 0 {
+			for _, gs := range glob {
+				if err = generateFiles(gs, &opts.optValues); err != nil {
+					errFile = gs
+					break
 				}
 			}
+		} else {
+			errFile = s
+			err = generateFiles(s, &opts.optValues)
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", errFile, err)
 		}
 	}
-	return
-}
-
-func writeTemplate(tpl *template.Template, values any, outfile string) error {
-	if out, err := os.Create(outfile); err != nil {
-		return err
-	} else {
-		defer out.Close()
-		return tpl.Execute(out, values)
-	}
+	return nil
 }
