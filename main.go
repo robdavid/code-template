@@ -22,7 +22,11 @@ type optValues struct {
 }
 
 func (opts *optValues) ParseNRange() error {
-	if pos := strings.Index(opts.nrangeSpec, "="); pos < 0 {
+	if opts.nrangeSpec == "" {
+		opts.nrange = ""
+		opts.nrangeVar = ""
+		return nil
+	} else if pos := strings.Index(opts.nrangeSpec, "="); pos < 0 {
 		return errBadNrange
 	} else {
 		opts.nrange = strings.TrimSpace(opts.nrangeSpec[pos+1:])
