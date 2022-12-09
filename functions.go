@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
+	"text/template"
 )
 
 var errBadType = errors.New("bad type")
@@ -97,8 +99,39 @@ func absTmpl(u any) (v any, err error) {
 	return
 }
 
+func tplMap(tmpl string, items any) (result []string, err error) {
+	itemVal := reflect.ValueOf(items)
+	if itemVal.Kind() == reflect.Slice || itemVal.Kind() == reflect.Array {
+		len := itemVal.Len()
+		result = make([]string, len)
+		for i := 0; i < len; i++ {
+			if result[i], err = tplFunc(tmpl, itemVal.Index(i).Interface()); err != nil {
+				return
+			}
+		}
+	} else {
+		err = fmt.Errorf("%w: got %T, wanted slice or array", errBadType, items)
+	}
+	return
+}
+
+func tplFunc(templateText string, data any) (string, error) {
+	t, err := template.New("tplFunc").Parse(templateText)
+	if err != nil {
+		return "", err
+	}
+	var result strings.Builder
+	if err := t.ExecuteTemplate(&result, "tplFunc", data); err != nil {
+		return "", err
+	} else {
+		return result.String(), nil
+	}
+}
+
 var tmplFuncs = map[string]any{
 	"seq":       seq,
 	"enumerate": enumerate,
 	"abs":       absTmpl,
+	"tplMap":    tplMap,
+	"tpl":       tplFunc,
 }

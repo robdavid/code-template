@@ -5,11 +5,12 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/Masterminds/sprig"
 	"github.com/stretchr/testify/assert"
 )
 
 func runTemplate(tmpl string, data any) string {
-	ptmpl, err := template.New("test").Funcs(tmplFuncs).Parse(tmpl)
+	ptmpl, err := template.New("test").Funcs(sprig.FuncMap()).Funcs(tmplFuncs).Parse(tmpl)
 	if err != nil {
 		panic(err)
 	}
@@ -30,4 +31,15 @@ func TestAbs(t *testing.T) {
 	assert.Equal(t, "6", i)
 	f := runTemplate(`{{abs -6.6}}`, nil)
 	assert.Equal(t, "6.6", f)
+}
+
+func TestTplFunc(t *testing.T) {
+	s := runTemplate(`{{ tpl "{{.hello}} {{.world}}" .}}`,
+		map[string]string{"hello": "Hello", "world": "World"})
+	assert.Equal(t, "Hello World", s)
+}
+
+func TestTplMap(t *testing.T) {
+	s := runTemplate(`{{ tplMap "{{.}}" (seq 1 5) | join "," }}`, nil)
+	assert.Equal(t, "1,2,3,4,5", s)
 }

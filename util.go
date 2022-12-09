@@ -131,6 +131,7 @@ func generate(opts *optValues, templateName string, templateContent string, outp
 			return result.String(), nil
 		}
 	}
+
 	includeFuncMap := map[string]any{"include": include}
 	if tpl, err = template.New(filepath.Base(templateName)).
 		Funcs(sprig.FuncMap()).
