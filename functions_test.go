@@ -40,6 +40,6 @@ func TestTplFunc(t *testing.T) {
 }
 
 func TestTplMap(t *testing.T) {
-	s := runTemplate(`{{ tplMap "{{.}}" (seq 1 5) | join "," }}`, nil)
+	s := runTemplate(`{{ mapTpl "{{.}}" (seq 1 5) | join "," }}`, nil)
 	assert.Equal(t, "1,2,3,4,5", s)
 }

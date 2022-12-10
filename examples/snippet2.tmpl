@@ -1,8 +1,7 @@
-{{ if eq .hello.counter 1 -}}
 package examples
+{{ if eq .hello.counter 5 -}}
 import "fmt"
-
-{{ end -}}
+{{ end }}
 
 func hello{{ .hello.counter }}() string {
 	return {{ printf "\"hello-world %d\\n\"" .hello.counter }}

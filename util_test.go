@@ -78,12 +78,17 @@ func TestMapValues(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestGenerateRange(t *testing.T) {
-	template := `{{ .my.range.value }}{{ .my.range.delim }}`
-	expected := "1-2-3-4-5-"
+func TestGenerate(t *testing.T) {
+	template := `{{ mapTpl "{{.}}" (seq 1 .max.value) | join .delim}}`
+	expected := "1-2-3-4-5"
 	var output strings.Builder
-	opts := optValues{nrangeVar: "my.range.value", nrange: "1..5", values: map[string]string{"my.range.delim": "-"}}
-	err := generate(&opts, "test", template, &output)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, output.String())
+	valuesStr := map[string]string{"max.value": "5", "delim": "-"}
+	values, err := mapValues(valuesStr)
+	if !assert.NoError(t, err) {
+		return
+	}
+	err = generate(values, "test", template, &output)
+	if assert.NoError(t, err) {
+		assert.Equal(t, expected, output.String())
+	}
 }

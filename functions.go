@@ -24,27 +24,49 @@ func abs[T ordered](t T) T {
 	}
 }
 
+func toInt(n any) (int, error) {
+	switch v := n.(type) {
+	case int:
+		return v, nil
+	case int32:
+		return int(v), nil
+	case int64:
+		return int(v), nil
+	case byte:
+		return int(v), nil
+	}
+	return 0, fmt.Errorf("%w: cannot convert %T to int", errBadType, n)
+}
+
 // Like the sprig seq function, except returns a slice
 // of ints rather than a string.
-func seq(params ...int) []int {
+func seq(params ...any) (result []int, err error) {
 	var nr numRange
 	nr.step = 1
 	np := len(params)
 	switch {
 	case np == 1:
-		nr.to = params[0]
+		if nr.to, err = toInt(params[0]); err != nil {
+			return
+		}
 	case np == 3:
-		nr.step = params[2]
+		if nr.step, err = toInt(params[2]); err != nil {
+			return
+		}
 		fallthrough
 	case np == 2:
-		nr.from = params[0]
-		nr.to = params[1]
+		if nr.from, err = toInt(params[0]); err != nil {
+			return
+		}
+		if nr.to, err = toInt(params[1]); err != nil {
+			return
+		}
 	}
-	result := make([]int, 0, abs(nr.to-nr.from)/nr.step)
+	result = make([]int, 0, abs(nr.to-nr.from)/nr.step)
 	for i := nr.from; nr.inRange(i); i += nr.step {
 		result = append(result, i)
 	}
-	return result
+	return result, err
 }
 
 type Enumerated struct {
@@ -99,7 +121,7 @@ func absTmpl(u any) (v any, err error) {
 	return
 }
 
-func tplMap(tmpl string, items any) (result []string, err error) {
+func mapTpl(tmpl string, items any) (result []string, err error) {
 	itemVal := reflect.ValueOf(items)
 	if itemVal.Kind() == reflect.Slice || itemVal.Kind() == reflect.Array {
 		len := itemVal.Len()
@@ -132,6 +154,6 @@ var tmplFuncs = map[string]any{
 	"seq":       seq,
 	"enumerate": enumerate,
 	"abs":       absTmpl,
-	"tplMap":    tplMap,
+	"mapTpl":    mapTpl,
 	"tpl":       tplFunc,
 }

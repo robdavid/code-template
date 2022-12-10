@@ -13,6 +13,27 @@ import (
 	"github.com/Masterminds/sprig"
 )
 
+type optValues struct {
+	nrangeSpec string
+	nrange     string
+	nrangeVar  string
+	values     map[string]string
+}
+
+func (opts *optValues) ParseNRange() error {
+	if opts.nrangeSpec == "" {
+		opts.nrange = ""
+		opts.nrangeVar = ""
+		return nil
+	} else if pos := strings.Index(opts.nrangeSpec, "="); pos < 0 {
+		return errBadNrange
+	} else {
+		opts.nrange = strings.TrimSpace(opts.nrangeSpec[pos+1:])
+		opts.nrangeVar = strings.TrimSpace(opts.nrangeSpec[:pos])
+		return nil
+	}
+}
+
 type numRange struct {
 	from, to int
 	step     int
@@ -112,16 +133,7 @@ func insertPath(path string, value any, top map[string]any) error {
 	return nil
 }
 
-func generate(opts *optValues, templateName string, templateContent string, output io.Writer) (err error) {
-	var numr numRange
-	var values map[string]any
-	if numr, err = parseNumRange(opts.nrange); err != nil {
-		return
-	}
-	if values, err = mapValues(opts.values); err != nil {
-		return err
-	}
-
+func generate(values map[string]any, templateName string, templateContent string, output io.Writer) (err error) {
 	var tpl *template.Template
 	include := func(templateName string, values any) (string, error) {
 		var result strings.Builder
@@ -140,35 +152,49 @@ func generate(opts *optValues, templateName string, templateContent string, outp
 		Parse(templateContent); err != nil {
 		return
 	}
-	if numr.undefined() {
-		err = tpl.Execute(output, values)
-	} else {
-		for n := numr.from; numr.inRange(n); n += numr.step {
-			insertPath(opts.nrangeVar, n, values)
-			if err = tpl.Execute(output, values); err != nil {
-				return
-			}
-		}
-	}
-	return
+	return tpl.Execute(output, values)
 }
 
-func generateFiles(fname string, opts *optValues) error {
-	var ext string
+func generateFile(values map[string]any, infile string, target string) error {
 	var source []byte
 	var err error
+	var output *os.File
+	if source, err = os.ReadFile(infile); err != nil {
+		return err
+	}
+	if output, err = os.Create(target); err != nil {
+		return err
+	}
+	defer output.Close()
+	return generate(values, infile, string(source), output)
+
+}
+
+func generateFiles(opts *optValues, fname string) error {
+	var ext string
+	var err error
+	var numr numRange
+	var values map[string]any
 	noext := fname
 	if ext = filepath.Ext(noext); ext != "" {
 		noext = noext[:len(noext)-len(ext)]
 	}
-	if source, err = os.ReadFile(fname); err != nil {
+	if numr, err = parseNumRange(opts.nrange); err != nil {
 		return err
 	}
-	target := fmt.Sprintf("%s_%s.go", noext, ext[1:])
-	if output, err := os.Create(target); err != nil {
+	if values, err = mapValues(opts.values); err != nil {
 		return err
+	}
+
+	if numr.undefined() {
+		return generateFile(values, fname, fmt.Sprintf("%s_%s.go", noext, ext[1:]))
 	} else {
-		defer output.Close()
-		return generate(opts, fname, string(source), output)
+		for n := numr.from; numr.inRange(n); n += numr.step {
+			insertPath(opts.nrangeVar, n, values)
+			if err = generateFile(values, fname, fmt.Sprintf("%s_%s_%d.go", noext, ext[1:], n)); err != nil {
+				return err
+			}
+		}
 	}
+	return nil
 }
