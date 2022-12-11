@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,19 +75,4 @@ func TestMapValues(t *testing.T) {
 	actual, err := mapValues(input)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
-}
-
-func TestGenerate(t *testing.T) {
-	template := `{{ mapTpl "{{.}}" (seq 1 .max.value) | join .delim}}`
-	expected := "1-2-3-4-5"
-	var output strings.Builder
-	valuesStr := map[string]string{"max.value": "5", "delim": "-"}
-	values, err := mapValues(valuesStr)
-	if !assert.NoError(t, err) {
-		return
-	}
-	err = generate(values, "test", template, &output)
-	if assert.NoError(t, err) {
-		assert.Equal(t, expected, output.String())
-	}
 }

@@ -1,0 +1,5 @@
+{{ define "hello-world" -}}
+func hello{{ .n }}() string {
+	return {{ printf "\"hello-world %d\"" .n }}
+}
+{{ end-}}

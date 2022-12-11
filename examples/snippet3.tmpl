@@ -1,0 +1,5 @@
+package examples
+
+{{ range $i,$n :=  seq .start .end -}}
+{{ include "hello-world" (dict "n" $n) }}
+{{ end -}}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	flag "github.com/spf13/pflag"
 )
@@ -15,7 +14,8 @@ var errBadNrange = errors.New("expected number range in the format var.name=<ran
 
 type options struct {
 	optValues
-	files []string
+	files    []string
+	includes []string
 }
 
 func main() {
@@ -23,8 +23,10 @@ func main() {
 	var help bool
 
 	flag.BoolVarP(&help, "help", "h", false, "Display help")
-	flag.StringVar(&opts.nrangeSpec, "num-range", "", "Numeric range to iterator over in format var.name=n..m")
+	flag.StringVar(&opts.nrangeSpec, "repeat", "", "Numeric range to iterator over in format var.name=n..m")
 	flag.StringToStringVar(&opts.values, "set", nil, "Set a value to place within template values")
+	flag.StringVarP(&opts.output, "output", "o", "", "Send output to specified file, - for standard out")
+	flag.StringArrayVarP(&opts.includes, "include", "i", nil, "Include specified files in each template execution")
 	flag.Parse()
 
 	if help {
@@ -45,22 +47,12 @@ func main() {
 	}
 }
 
-func generateForOpts(opts *options) (err error) {
-	for _, s := range opts.files {
-		var errFile string
-		if glob, gerr := filepath.Glob(s); gerr != nil && len(glob) > 0 {
-			for _, gs := range glob {
-				if err = generateFiles(&opts.optValues, gs); err != nil {
-					errFile = gs
-					break
-				}
-			}
-		} else {
-			errFile = s
-			err = generateFiles(&opts.optValues, s)
-		}
-		if err != nil {
-			return fmt.Errorf("%s: %w", errFile, err)
+func generateForOpts(opts *options) error {
+	var cache outputCache
+	defer cache.close()
+	for _, s := range expandGlob(opts.files) {
+		if err := runTemplate(&opts.optValues, &cache, s, opts.includes); err != nil {
+			return fmt.Errorf("%s: %w", s, err)
 		}
 	}
 	return nil

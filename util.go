@@ -2,15 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"text/template"
 
-	"github.com/Masterminds/sprig"
+	. "github.com/robdavid/genutil-go/errors/handler"
 )
 
 type optValues struct {
@@ -18,6 +15,7 @@ type optValues struct {
 	nrange     string
 	nrangeVar  string
 	values     map[string]string
+	output     string
 }
 
 func (opts *optValues) ParseNRange() error {
@@ -51,13 +49,6 @@ func (nr *numRange) inRange(n int) bool {
 	}
 }
 
-func must[T any](t T, e error) T {
-	if e != nil {
-		panic(e)
-	}
-	return t
-}
-
 var numRangeRegexp = regexp.MustCompile(`^([0-9]+)\.\.([0-9]+)$`)
 
 func parseNumRange(nrange string) (result numRange, err error) {
@@ -69,8 +60,8 @@ func parseNumRange(nrange string) (result numRange, err error) {
 		err = fmt.Errorf("%w: %s", errInvalidNumberRange, nrange)
 		return
 	}
-	result.from = must(strconv.Atoi(matches[1]))
-	result.to = must(strconv.Atoi(matches[2]))
+	result.from = Must(strconv.Atoi(matches[1]))
+	result.to = Must(strconv.Atoi(matches[2]))
 	if result.to < result.from {
 		result.step = -1
 	} else {
@@ -133,68 +124,50 @@ func insertPath(path string, value any, top map[string]any) error {
 	return nil
 }
 
-func generate(values map[string]any, templateName string, templateContent string, output io.Writer) (err error) {
-	var tpl *template.Template
-	include := func(templateName string, values any) (string, error) {
-		var result strings.Builder
-		if err := tpl.ExecuteTemplate(&result, templateName, values); err != nil {
-			return "", nil
-		} else {
-			return result.String(), nil
-		}
-	}
-
-	includeFuncMap := map[string]any{"include": include}
-	if tpl, err = template.New(filepath.Base(templateName)).
-		Funcs(sprig.FuncMap()).
-		Funcs(tmplFuncs).
-		Funcs(includeFuncMap).
-		Parse(templateContent); err != nil {
-		return
-	}
-	return tpl.Execute(output, values)
-}
-
-func generateFile(values map[string]any, infile string, target string) error {
-	var source []byte
-	var err error
-	var output *os.File
-	if source, err = os.ReadFile(infile); err != nil {
-		return err
-	}
-	if output, err = os.Create(target); err != nil {
-		return err
-	}
-	defer output.Close()
-	return generate(values, infile, string(source), output)
-
-}
-
-func generateFiles(opts *optValues, fname string) error {
+func defaultOutput(input string, suffix string) string {
 	var ext string
-	var err error
-	var numr numRange
-	var values map[string]any
-	noext := fname
+	noext := input
 	if ext = filepath.Ext(noext); ext != "" {
 		noext = noext[:len(noext)-len(ext)]
 	}
-	if numr, err = parseNumRange(opts.nrange); err != nil {
-		return err
-	}
-	if values, err = mapValues(opts.values); err != nil {
-		return err
-	}
-
-	if numr.undefined() {
-		return generateFile(values, fname, fmt.Sprintf("%s_%s.go", noext, ext[1:]))
+	if suffix == "" {
+		return fmt.Sprintf("%s_%s.go", noext, ext[1:])
 	} else {
-		for n := numr.from; numr.inRange(n); n += numr.step {
-			insertPath(opts.nrangeVar, n, values)
-			if err = generateFile(values, fname, fmt.Sprintf("%s_%s_%d.go", noext, ext[1:], n)); err != nil {
-				return err
-			}
+		return fmt.Sprintf("%s_%s_%s.go", noext, ext[1:], suffix)
+	}
+}
+
+func expandGlob(files []string) (result []string) {
+	result = make([]string, 0, len(files))
+	for _, f := range files {
+		if glob, err := filepath.Glob(f); err == nil && len(glob) > 0 {
+			result = append(result, glob...)
+		} else {
+			result = append(result, f)
 		}
 	}
-	return nil
+	return
+}
+
+func runTemplate(opts *optValues, cache *outputCache, file string, includes []string) (err error) {
+	defer Catch(&err)
+	output := opts.output
+	if output == "" {
+		output = defaultOutput(file, "")
+	}
+	templateFiles := []string{file}
+	templateFiles = append(templateFiles, expandGlob(includes)...)
+	numr := Try(parseNumRange(opts.nrange))
+	te := Try(parseFromFiles(templateFiles))
+	te.output = output
+	te.values = Try(mapValues(opts.values))
+	if numr.undefined() {
+		Check(te.execute(cache))
+	} else {
+		for n := numr.from; numr.inRange(n); n += numr.step {
+			insertPath(opts.nrangeVar, n, te.values)
+			Check(te.execute(cache))
+		}
+	}
+	return
 }

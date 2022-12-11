@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"text/template"
+
+	. "github.com/robdavid/genutil-go/errors/handler"
 )
 
 var errBadType = errors.New("bad type")
@@ -44,29 +46,22 @@ func seq(params ...any) (result []int, err error) {
 	var nr numRange
 	nr.step = 1
 	np := len(params)
+	defer Catch(&err)
 	switch {
 	case np == 1:
-		if nr.to, err = toInt(params[0]); err != nil {
-			return
-		}
+		nr.to = Try(toInt(params[0]))
 	case np == 3:
-		if nr.step, err = toInt(params[2]); err != nil {
-			return
-		}
+		nr.step = Try(toInt(params[2]))
 		fallthrough
 	case np == 2:
-		if nr.from, err = toInt(params[0]); err != nil {
-			return
-		}
-		if nr.to, err = toInt(params[1]); err != nil {
-			return
-		}
+		nr.from = Try(toInt(params[0]))
+		nr.to = Try(toInt(params[1]))
 	}
 	result = make([]int, 0, abs(nr.to-nr.from)/nr.step)
 	for i := nr.from; nr.inRange(i); i += nr.step {
 		result = append(result, i)
 	}
-	return result, err
+	return
 }
 
 type Enumerated struct {
