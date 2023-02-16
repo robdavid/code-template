@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
+	"github.com/robdavid/genutil-go/maps"
 )
 
 type optValues struct {
@@ -49,7 +50,7 @@ func (nr *numRange) inRange(n int) bool {
 	}
 }
 
-var numRangeRegexp = regexp.MustCompile(`^([0-9]+)\.\.([0-9]+)$`)
+var numRangeRegexp = regexp.MustCompile(`^(-?[0-9]+)\.\.(-?[0-9]+)$`)
 
 func parseNumRange(nrange string) (result numRange, err error) {
 	if nrange == "" {
@@ -98,28 +99,12 @@ func mapValues(strValues map[string]string) (map[string]any, error) {
 
 func insertPath(path string, value any, top map[string]any) error {
 	pathList := strings.Split(path, ".")
-	m := top
-	for i, s := range pathList {
-		if i == len(pathList)-1 {
-			if n, ok := m[s]; ok {
-				if _, ok := n.(map[string]any); ok {
-					return fmt.Errorf("%w at %s", errKeyConflict, path)
-				}
-			}
-			m[s] = value
-		} else {
-			if n, ok := m[s]; ok {
-				if nm, okm := n.(map[string]any); okm {
-					m = nm
-				} else {
-					return fmt.Errorf("%w at %s", errKeyConflict, strings.Join(pathList[:i+1], "."))
-				}
-			} else {
-				n := make(map[string]any)
-				m[s] = n
-				m = n
-			}
+	if err := maps.PutPath(pathList, value, top); err != nil {
+		if pathErr, ok := err.(maps.PathConflict[string]); ok {
+			pathStr := strings.Join([]string(pathErr), ".")
+			return fmt.Errorf("%w at %s", errKeyConflict, pathStr)
 		}
+		return err
 	}
 	return nil
 }

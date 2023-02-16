@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,4 +76,63 @@ func TestMapValues(t *testing.T) {
 	actual, err := mapValues(input)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
+}
+
+func TestParseNRangeEmpty(t *testing.T) {
+	var opts optValues
+	opts.nrangeSpec = ""
+	test.Check(t, opts.ParseNRange())
+	assert.Equal(t, "", opts.nrange)
+	assert.Equal(t, "", opts.nrangeVar)
+}
+
+func TestParseNRangeErr(t *testing.T) {
+	var opts optValues
+	opts.nrangeSpec = "var"
+	assert.ErrorIs(t, opts.ParseNRange(), errBadNrange)
+}
+
+func TestParseNRange(t *testing.T) {
+	var opts optValues
+	opts.nrangeSpec = "var=1..10"
+	test.Check(t, opts.ParseNRange())
+	assert.Equal(t, "var", opts.nrangeVar)
+	assert.Equal(t, "1..10", opts.nrange)
+}
+
+func TestParseNumRangeEmpty(t *testing.T) {
+	numRange := test.Result(parseNumRange("")).Must(t)
+	assert.Equal(t, 0, numRange.from)
+	assert.Equal(t, 0, numRange.to)
+	assert.Equal(t, 0, numRange.step)
+	assert.True(t, numRange.undefined())
+}
+
+func TestParseNumRange(t *testing.T) {
+	numRange := test.Result(parseNumRange("1..10")).Must(t)
+	assert.Equal(t, 1, numRange.from)
+	assert.Equal(t, 10, numRange.to)
+	assert.Equal(t, 1, numRange.step)
+	assert.False(t, numRange.undefined())
+}
+
+func TestParseNumRangeReverse(t *testing.T) {
+	numRange := test.Result(parseNumRange("10..1")).Must(t)
+	assert.Equal(t, 10, numRange.from)
+	assert.Equal(t, 1, numRange.to)
+	assert.Equal(t, -1, numRange.step)
+	assert.False(t, numRange.undefined())
+}
+
+func TestParseNumRangeNegative(t *testing.T) {
+	numRange := test.Result(parseNumRange("-10..-1")).Must(t)
+	assert.Equal(t, -10, numRange.from)
+	assert.Equal(t, -1, numRange.to)
+	assert.Equal(t, 1, numRange.step)
+	assert.False(t, numRange.undefined())
+}
+
+func TestParseNumRangeInvalid(t *testing.T) {
+	_, err := parseNumRange("-10.0..-1.0")
+	assert.ErrorContains(t, err, "invalid number range: -10.0..-1.0")
 }
