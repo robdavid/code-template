@@ -2,7 +2,7 @@ module github.com/robdavid/code-template
 
 go 1.19
 
-require github.com/robdavid/genutil-go v0.11.0
+require github.com/robdavid/genutil-go v0.15.0
 
 require (
 	github.com/Masterminds/semver v1.5.0 // indirect
