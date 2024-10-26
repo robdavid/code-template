@@ -99,7 +99,7 @@ func mapValues(strValues map[string]string) (map[string]any, error) {
 
 func insertPath(path string, value any, top map[string]any) error {
 	pathList := strings.Split(path, ".")
-	if err := maps.PutPath(pathList, value, top); err != nil {
+	if err := maps.PutPath(top, pathList, value); err != nil {
 		if pathErr, ok := err.(maps.PathConflict[string]); ok {
 			pathStr := strings.Join([]string(pathErr), ".")
 			return fmt.Errorf("%w at %s", errKeyConflict, pathStr)
